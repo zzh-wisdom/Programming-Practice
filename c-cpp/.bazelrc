@@ -1,0 +1,89 @@
+# 把本文存为 $HOME/.bazelrc
+# 或者放在 WORKSPACE 同目录的 .bazelrc
+
+
+# 什么是 optional configuration file
+# Bazel looks for an optional configuration file in the following locations,
+# in order. It will stop searching once it has successfully found a file.
+#
+# 1 The path specified by the --bazelrc=file startup option. If specified, this
+#   option must appear before the command name (e.g. build)
+# 2 A file named .bazelrc in your base workspace directory
+# 3 A file named .bazelrc in your home directory
+#
+# The option --bazelrc=/dev/null effectively disables the use of a
+# configuration file. We strongly recommend that you use this option when
+# performing release builds, or automated tests that invoke Bazel
+
+# 想在构建中禁用 optional bazelrc 使用下面的命令行
+# bazel --bazelrc=/dev/null build xxx
+
+# 什么是 master bazelrc
+# Bazel also looks for a master rc file
+# 1 named bazel.bazelrc next to the binary,
+# 2 in the workspace at tools/bazel.rc
+# 3 or system-wide at /etc/bazel.bazelrc.
+
+# 想在构建中禁用 master bazelrc
+# bazel -nomaster_bazelrc build xxx
+
+
+
+# 共同的 build 选项
+build -s  # 并且使用 strip 选项来删除未使用的符号和调试信息。
+# build -c dbg  # 调试模式
+build --config=disk
+# build --copt=-ggdb3  # 调试信息
+# build --copt=-O2
+
+build --copt=-std=c++11
+build --copt=-Wall    # 用于启用所有警告（warning）
+# build --copt=-Wshadow
+build --copt=-Wnon-virtual-dtor  # 用于启用警告（warning），当类中的析构函数不是虚拟函数（virtual destructor）时会触发该警告
+build --copt=-fPIC
+build --copt=-fno-strict-aliasing  # 禁用严格别名规则（strict aliasing rules）
+build --copt=-fwrapv           # GCC 编译器的选项，用于启用溢出检测和包装（overflow detection and wrapping
+build --copt=-pthread
+build --linkopt=-pthread
+# build --linkopt=-lrt
+# build --linkopt=-lz
+# build --linkopt=-ldl
+# build --linkopt=-lcrypto
+build --ignore_unsupported_sandboxing
+build --verbose_failures
+# build --crosstool_top=@ks_build_tools//bazel-toolchain:gcc83-toolchain
+
+#==> opt
+build:opt -c opt
+build:dbg -c dbg
+
+# ==> remote cache
+# Definition of --config=remote
+# build:remote --spawn_strategy=remote --genrule_strategy=remote
+# build:remote --strategy=Javac=remote --strategy=Closure=remote
+# build:remote --remote_http_cache=http://dev4.corp.kuaishou.com:1080/cache
+# # sharing remote cache hits across machines
+# build:remote --experimental_strict_action_env
+# <== end remote cache
+
+
+# ==> disk cache
+# Definition of --config=disk
+build:disk --disk_cache=~/.cache/bazel/disk_cache
+# enable cache hits across different workspaces
+build:disk --experimental_strict_action_env
+# <== end disk cache
+
+
+# Address sanitizer
+# To use it: bazel build --config=asan
+#build:asan --crosstool_top //tools/lrte:toolchain
+#build:asan --compiler clang
+build:asan --strip=never
+build:asan --copt -fsanitize=address
+build:asan --copt -DADDRESS_SANITIZER
+build:asan --copt -O1
+build:asan --copt -g
+build:asan --copt -fno-omit-frame-pointer
+build:asan --linkopt -fsanitize=address
+build:asan --linkopt -static-libasan

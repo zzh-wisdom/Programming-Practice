@@ -32,3 +32,8 @@
 *.app
 
 .vscode
+bin
+bazel-*
+
+MODULE.bazel
+MODULE.bazel.lock
