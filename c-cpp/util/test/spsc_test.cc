@@ -49,6 +49,10 @@ void Dequeue(ThreadInfo& thread_info) {
         // printf("dequeue %d\n", i);
         i++;
         thread_info.count++;
+
+        if(i % 10000000 == 0) {
+            printf("queue size: %u, count: %llu\n", queue->size(), thread_info.count);
+        }
     }
     return;
 }
@@ -66,9 +70,9 @@ int main(int argc, char** argv) {
     type = atoi(argv[1]);
     size = atoi(argv[2]);
     op_num = atoi(argv[3]);
-    printf("type: %llu, size: %llu, op_num: %llu\n", type, size, op_num);
-
     queue = new KFifo(size);
+    printf("type: %llu, queue capacity: %u, op_num: %llu\n", type, queue->capacity(), op_num);
+
     thread_info.resize(2);
 
     auto start_times = NowNanos();

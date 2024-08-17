@@ -100,7 +100,7 @@ struct __kfifo {
  * kfifo_size - returns the size of the fifo in elements
  * @fifo: address of the fifo to be used
  */
-#define kfifo_size(fifo)	(fifo.mask + 1)
+#define kfifo_size(fifo)	((fifo).mask + 1)
 
 /**
  * kfifo_reset - removes the entire fifo content
@@ -134,7 +134,7 @@ struct __kfifo {
  */
 #define kfifo_len(fifo) \
 ({ \
-	fifo.in - fifo.out; \
+	(fifo).in - (fifo).out; \
 })
 
 /**
@@ -204,4 +204,8 @@ public:
 	bool enqueue(const void *val) override;
 
 	bool dequeue(const void **val) override;
+
+	uint32_t size() override;
+
+	uint32_t capacity() override;
 };
