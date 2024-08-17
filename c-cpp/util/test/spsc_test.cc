@@ -56,7 +56,7 @@ void Dequeue(ThreadInfo& thread_info) {
 // ./bazel-bin/util/test/spsc_test 1 1024 1000000000
 // macOS笔记本上的最优size: 4096
 // ./bazel-bin/util/test/spsc_test 1 4096 1000000000
-
+// avg: 7.19783 nsec/op
 int main(int argc, char** argv) {
     if (argc < 4) {
         printf("Usage: %s <type: 1-kfifo, 2-std::queue> <size> <op_num>\n",

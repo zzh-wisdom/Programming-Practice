@@ -65,7 +65,7 @@ bool __kfifo_in(struct __kfifo* fifo, const void* val) {
     uint32_t off = fifo->in & fifo->mask;
 
     // acquire_fence();
-    // 猜想：这里if else 可以防止指令重排
+    // 猜想：这里if else 可以防止store指令重排
 
     fifo->data[off] = val;
 
@@ -84,7 +84,7 @@ bool __kfifo_out_peek(struct __kfifo* fifo, const void** val) {
 
     uint32_t off = fifo->out & fifo->mask;
 
-    // acquire_fence();
+    acquire_fence(); // 预防 fifo->data[off]的读取 被重排到  fifo->in的读取 之前
 
     *val = fifo->data[off];
 
