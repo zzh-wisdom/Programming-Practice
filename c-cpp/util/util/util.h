@@ -192,5 +192,6 @@ struct HistogramStat {
 struct ThreadInfo {
     HistogramStat stat;
     uint64_t count;
-    ThreadInfo() : stat(HistogramStat()), count(0) {}
+    int thread_id;
+    ThreadInfo() : stat(HistogramStat()), count(0), thread_id(-1) {}
 };

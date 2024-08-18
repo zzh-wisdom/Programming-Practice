@@ -18,3 +18,21 @@ cc_binary(
         "//util/util:util",
     ],
 )
+
+cc_binary(
+    name = "mpmc_test",
+    includes = [".."],
+    srcs = glob([
+        "mpmc_test.cc",
+    ]),
+    copts = [
+        "-Werror",
+        "-Wall"
+        # "-Wno-sign-compare",
+        # "-Wno-error=format"
+    ],
+    deps = [
+        "//util/concurrent_queue:concurrent_queue",
+        "//util/util:util",
+    ],
+)

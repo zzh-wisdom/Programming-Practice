@@ -12,9 +12,12 @@
 uint64_t type;
 uint64_t size;
 uint64_t op_num;
+int producer_num;
+int consumer_num;
 uint64_t run_time = 60;  // 单位为秒
 std::vector<std::thread> threads;
-std::vector<ThreadInfo> thread_info;
+std::vector<ThreadInfo> producer_thread_info;
+std::vector<ThreadInfo> consumer_thread_info;
 ConQueue* queue = nullptr;
 std::atomic<bool> quit(false);
 
@@ -25,36 +28,41 @@ void Stop(uint64_t delay) {
 }
 
 void Enqueue(ThreadInfo& thread_info) {
+    printf("Enqueue start, thread_id: %d\n", thread_info.thread_id);
     uint64_t i = 0;
     while (i < op_num) {
         void* val = (void*)(uintptr_t)i;
         if (!queue->enqueue(val)) continue;
-        // printf("enqueue %d\n", i);
+        if(i%100 == 0) printf("enqueue %llu\n", i);
         i++;
         thread_info.count++;
     }
+    printf("Enqueue over, thread_id: %d\n", thread_info.thread_id);
     return;
 }
 
 void Dequeue(ThreadInfo& thread_info) {
+    printf("Dequeue start, thread_id: %d\n", thread_info.thread_id);
     uint64_t i = 0;
     while (i < op_num) {
         const void* val;
         if (!queue->dequeue(&val)) continue;
         uint64_t ret = (uint64_t)(uintptr_t)val;
         if (ret != i) {
-            std::cout << "Test Fail!" << std::endl;
-            printf("ret[%llu] != i[%llu]\n", ret, i);
-            exit(1);
+            // TODO: 检查ret
+            // std::cout << "Test Fail!" << std::endl;
+            // printf("ret[%llu] != i[%llu]\n", ret, i);
+            // exit(1);
         }
-        // printf("dequeue %d\n", i);
+        if(i%100 == 0) printf("dequeue %llu\n", i);
         i++;
         thread_info.count++;
 
-        if(i % 10000000 == 0) {
+        if(i % 1000000 == 0) {
             printf("queue size: %u, count: %llu\n", queue->size(), thread_info.count);
         }
     }
+    printf("Dequeue over, thread_id: %d\n", thread_info.thread_id);
     return;
 }
 
@@ -62,9 +70,6 @@ void InitQueue() {
     switch (type) 
     {
     case 1:
-        queue = new KFifo(size);
-        break;
-    case 2:
         queue = new ArrayBaseLinkedQueue(size);
         break;
     default:
@@ -79,22 +84,36 @@ void InitQueue() {
 // ./bazel-bin/util/test/spsc_test 1 4096 1000000000
 // avg: 7.19783 nsec/op
 int main(int argc, char** argv) {
-    if (argc < 4) {
-        printf("Usage: %s <type: 1-kfifo, 2-std::arr_base_linked_queue> <size> <op_num>\n",
+    if (argc < 6) {
+        printf("Usage: %s <type: 1-std::arr_base_linked_queue> <size> <op_num> <producer_num> <consumer_num>\n",
                argv[0]);
         return -1;
     }
     type = atoi(argv[1]);
     size = atoi(argv[2]);
     op_num = atoi(argv[3]);
+    producer_num = atoi(argv[4]);
+    consumer_num = atoi(argv[5]);
     InitQueue();
     printf("type: %llu, queue capacity: %d, op_num: %llu\n", type, queue->capacity(), op_num);
 
-    thread_info.resize(2);
+    producer_thread_info.resize(producer_num);
+    consumer_thread_info.resize(consumer_num);
+    for(int i = 0; i < producer_num; i++) {
+        producer_thread_info[i].thread_id = i;
+    }
+    for(int i = 0; i < consumer_num; i++) {
+        consumer_thread_info[i].thread_id = i;
+    }
 
     auto start_times = NowNanos();
-    threads.push_back(std::thread(Enqueue, std::ref(thread_info[0])));
-    threads.push_back(std::thread(Dequeue, std::ref(thread_info[1])));
+    for(int i = 0; i < producer_num; i++) {
+        threads.push_back(std::thread(Enqueue, std::ref(producer_thread_info[i])));
+    }
+
+    for(int i = 0; i < consumer_num; i++) {
+        threads.push_back(std::thread(Dequeue, std::ref(consumer_thread_info[i])));
+    }
     for (auto& thread : threads) {
         thread.join();
     }

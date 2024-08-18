@@ -117,10 +117,10 @@ bool KFifo::dequeue(const void** val) {
 	return __kfifo_out(&fifo_, val);
 }
 
-uint32_t KFifo::size() {
+int KFifo::size() {
 	return kfifo_len(fifo_);
 }
 
-uint32_t KFifo::capacity() {
+int KFifo::capacity() {
 	return kfifo_size(fifo_);
 }

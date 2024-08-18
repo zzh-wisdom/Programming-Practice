@@ -199,13 +199,16 @@ public:
 
 	KFifo(uint32_t size);
 
+	KFifo(const KFifo&) = delete;
+    KFifo& operator=(const KFifo&) = delete;
+
 	~KFifo() override;
 
 	bool enqueue(const void *val) override;
 
 	bool dequeue(const void **val) override;
 
-	uint32_t size() override;
+	int size() override;
 
-	uint32_t capacity() override;
+	int capacity() override;
 };

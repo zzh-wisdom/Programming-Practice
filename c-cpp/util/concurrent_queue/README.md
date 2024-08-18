@@ -36,14 +36,35 @@ wmb - sfence
 
 正常逻辑操作是要对队列操作进行加锁处理。加锁的性能开销较大，一般采用无锁实现。无锁实现原理是CAS、FAA等机制。
 
+使用链表实现多对多的变长无锁队列，参考：https://coolshell.cn/articles/8239.html
+
+使用链表的方式实现变长无锁队列有一些缺点：
+
+1. 频繁申请和释放空间，若配合内存池则有空间浪费问题
+2. ABA问题，需要解决
+3. 变长，不适合限制资源增长
+
+推荐使用数组方式实现定长无锁并发队列，具体有两种方法：
+
+1. 用数组作为资源池实现定长的链表式无锁队列。
+   1. 自己基于《[无锁队列的实现》](https://coolshell.cn/articles/8239.html)中无锁链表的实现，进行改造。
+   2. 但仍然有ABA问题，需要用引用计数防止释放的方式实现
+   3. 存在问题：池化实现比较复杂，开销太大
+2. 论文《Implementing Lock-Free Queues》的实现，需要使用double-CAS，先不考虑
+3. intel dpdk提供的rte_ring实现：http://blog.csdn.net/linzhaolover/article/details/9771329
 
 ## ABA问题
+
+问题的原理：https://blog.csdn.net/weixin_34309543/article/details/94260402
+![](images/Markdown-image-2024-08-18-18-28-42.png)
+
+无锁栈的场景比较好理解：线程1想出栈，准备CAS设置新的head时，线程2接连pop A、pop B，delete B，push A。此时线程1错误以为head没有改过，改新head设置为B，造成操作。
 
 综合来看还是方法1比较好。代价是浪费一些内存。或者还是用数组实现为定长队列吧。
 
 1. 以无锁方式循环节点的一种很自然的办法就是让每个线程维护它自己的由未使用队列项所组成的私有空闲链表。
 当一个入队线程需要一个新节点时，它尝试从线程本地空闲链表中删除一个节点。如果空闲链表为空， 就new一个新节点。当一个出队线程准备释放一个节点时，它将该节点放入线程本地空闲链表。因为链表是线程本地的，因此不需要很大的同步开销。只要每个线程入队和出队次数大致相同，这种设计的效果就非常好。如果两种操作次数不平衡，则需要更加复杂的技术。
-2. double CAS（每一次赋值，将指针的count+1赋值给被赋值指针）。_InterlockedCompareExchange128，但128位原子操作可能有性能问题
+1. double CAS（每一次赋值，将指针的count+1赋值给被赋值指针）。_InterlockedCompareExchange128，但128位原子操作可能有性能问题
 https://zhuanlan.zhihu.com/p/352723264
 
 ```cpp

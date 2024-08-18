@@ -13,7 +13,7 @@ class ConQueue {
 
     virtual bool dequeue(const void** val) = 0;
 
-    virtual uint32_t size() = 0;
+    virtual int size() = 0;
 
-    virtual uint32_t capacity() = 0;
+    virtual int capacity() = 0;
 };
