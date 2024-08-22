@@ -90,6 +90,7 @@ ArrayBaseLinkedQueue::Node* ArrayBaseLinkedQueue::SafeRead(std::atomic<Node*> &q
             return p;
         }
         p->IncRef(std::memory_order_seq_cst);
+        // 这里涉及storeload栅栏，可能有bug
         if (p == q.load(std::memory_order_seq_cst)){
             return p;
         }else{
