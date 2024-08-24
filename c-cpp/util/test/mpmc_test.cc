@@ -3,15 +3,18 @@
 #include <iostream>
 #include <thread>
 #include <vector>
+#include <cstdio>
 
 #include "util/util.h"
 
 #include "concurrent_queue/kfifo.h"
 #include "concurrent_queue/arr_base_linked_queue.h"
+#include "concurrent_queue/linked_queue.h"
 
+const int MAX_THREAD_NUM = 128;
 uint64_t type;
 uint64_t size;
-uint64_t op_num;
+uint64_t op_num_per_thread;
 int producer_num;
 int consumer_num;
 uint64_t run_time = 60;  // 单位为秒
@@ -30,35 +33,49 @@ void Stop(uint64_t delay) {
 void Enqueue(ThreadInfo& thread_info) {
     printf("Enqueue start, thread_id: %d\n", thread_info.thread_id);
     uint64_t i = 0;
-    while (i < op_num) {
-        void* val = (void*)(uintptr_t)i;
+    uint64_t thread_id = thread_info.thread_id;
+    uint64_t last_val = thread_id;
+    while (i < op_num_per_thread) {
+        uint64_t cur_val = (i << 8) | thread_id;
+        if (cur_val != thread_id && cur_val <= last_val) {
+            std::cout << "Test Fail!" << std::endl;
+            printf("cur_val[%llu] <= last_val[%llu]\n", cur_val, last_val);
+            exit(1);
+        }
+        void* val = (void*)(uintptr_t)cur_val;
         if (!queue->enqueue(val)) continue;
-        if(i%100 == 0) printf("enqueue %llu\n", i);
+        // if(i%100 == 0) printf("enqueue %llu\n", i);
         i++;
         thread_info.count++;
+        last_val = cur_val;
     }
     printf("Enqueue over, thread_id: %d\n", thread_info.thread_id);
     return;
 }
 
 void Dequeue(ThreadInfo& thread_info) {
+    std::vector<uint64_t> last_seqs;
+    last_seqs.resize(MAX_THREAD_NUM);
     printf("Dequeue start, thread_id: %d\n", thread_info.thread_id);
     uint64_t i = 0;
-    while (i < op_num) {
+    while (i < op_num_per_thread) {
         const void* val;
         if (!queue->dequeue(&val)) continue;
         uint64_t ret = (uint64_t)(uintptr_t)val;
-        if (ret != i) {
-            // TODO: 检查ret
-            // std::cout << "Test Fail!" << std::endl;
-            // printf("ret[%llu] != i[%llu]\n", ret, i);
-            // exit(1);
+        uint64_t thread_id = ret & 0xff;
+        uint64_t seq = ret >> 8;
+        if (seq != 0 &&  seq <= last_seqs[thread_id]) {
+            std::cout << "Test Fail!" << std::endl;
+            printf("thread_id=%llu, seq[%llu] <= last_seqs[%llu]\n", thread_id, seq, last_seqs[thread_id]);
+            exit(1);
         }
-        if(i%100 == 0) printf("dequeue %llu\n", i);
+        last_seqs[thread_id] = seq;
+
+        // if(i%100 == 0) printf("dequeue %llu\n", i);
         i++;
         thread_info.count++;
 
-        if(i % 1000000 == 0) {
+        if(i % 10000000 == 0) {
             printf("queue size: %u, count: %llu\n", queue->size(), thread_info.count);
         }
     }
@@ -66,11 +83,25 @@ void Dequeue(ThreadInfo& thread_info) {
     return;
 }
 
+void checkParams() {
+    if (producer_num > MAX_THREAD_NUM || consumer_num > MAX_THREAD_NUM) {
+        printf("Not support producer_num or consumer_num > %d\n", MAX_THREAD_NUM);
+        exit(1);
+    }
+    return;
+}
+
 void InitQueue() {
     switch (type) 
     {
+    case 0:
+        queue = new KFifo(size);
+        break;
     case 1:
         queue = new ArrayBaseLinkedQueue(size);
+        break;
+    case 2:
+        queue = new LinkedQueue(size);
         break;
     default:
         printf("Not support type: %llu\n", type);
@@ -79,23 +110,30 @@ void InitQueue() {
     }
 }
 
-// ./bazel-bin/util/test/spsc_test 1 1024 1000000000
-// macOS笔记本上的最优size: 4096
-// ./bazel-bin/util/test/spsc_test 1 4096 1000000000
-// avg: 7.19783 nsec/op
+// 性能数据：
+// MacOS
+// kfifo：./bazel-bin/util/test/mpmc_test 0 4096 100000000 1 1
+//      146256456 ops/sec 6.8373 ns
+// linked_queue: ./bazel-bin/util/test/mpmc_test 2 4096 100000000 1 1
+//     1-1: 15296317 ops/sec 65.3752 ns
+
+// ./bazel-bin/util/test/mpmc_test 2 4096 1000000 2 2
 int main(int argc, char** argv) {
     if (argc < 6) {
-        printf("Usage: %s <type: 1-std::arr_base_linked_queue> <size> <op_num> <producer_num> <consumer_num>\n",
+        // kfifo 只支持单生产者单消费者
+        printf("Usage: %s <type: 0-kfifo, 1-arr_base_linked_queue, 2-linked_queue> <size> <op_num_per_thread> <producer_num> <consumer_num>\n",
                argv[0]);
         return -1;
     }
     type = atoi(argv[1]);
     size = atoi(argv[2]);
-    op_num = atoi(argv[3]);
+    op_num_per_thread = atoi(argv[3]);
     producer_num = atoi(argv[4]);
     consumer_num = atoi(argv[5]);
+    printf("type: %llu, size: %llu, op_num_per_thread: %llu, producer_num: %d, consumer_num: %d\n", type, size, op_num_per_thread, producer_num, consumer_num);
+    checkParams();
     InitQueue();
-    printf("type: %llu, queue capacity: %d, op_num: %llu\n", type, queue->capacity(), op_num);
+    printf("queue size: %d\n", queue->capacity());
 
     producer_thread_info.resize(producer_num);
     consumer_thread_info.resize(consumer_num);
@@ -120,15 +158,16 @@ int main(int argc, char** argv) {
     auto end_times = NowNanos();
 
     double cost_sec = (end_times - start_times) * 1.0 / 1000000000;
-
+    uint64_t op_num = op_num_per_thread * (producer_num + consumer_num);
+    std::cout << "total op_num: " << op_num  << std::endl;
     std::cout << "cost time: " << cost_sec << " s" << std::endl;
     std::cout << "Average Throughput: "
-              << (uint64_t)(op_num * 2 / cost_sec)
+              << (uint64_t)(op_num / cost_sec)
               << " ops/sec " << std::endl;
 
-    std::cout << "Average Latency: " << (end_times - start_times) * 1.0 / (op_num * 2) << " ns"
+    std::cout << "Average Latency: " << (end_times - start_times) * 1.0 / (op_num) << " ns"
               << std::endl;
 
-    std::cout << "Write Test Success!" << std::endl;
+    std::cout << "Test Success!" << std::endl;
     return 0;
 }

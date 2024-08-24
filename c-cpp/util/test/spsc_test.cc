@@ -78,6 +78,8 @@ void InitQueue() {
 // macOS笔记本上的最优size: 4096
 // ./bazel-bin/util/test/spsc_test 1 4096 1000000000
 // avg: 7.19783 nsec/op
+// ./bazel-bin/util/test/spsc_test 2 4096 100000000
+// avg: 75.3207 nsec/op
 int main(int argc, char** argv) {
     if (argc < 4) {
         printf("Usage: %s <type: 1-kfifo, 2-std::arr_base_linked_queue> <size> <op_num>\n",
@@ -110,6 +112,6 @@ int main(int argc, char** argv) {
     std::cout << "Average Latency: " << (end_times - start_times) * 1.0 / (op_num * 2) << " ns"
               << std::endl;
 
-    std::cout << "Write Test Success!" << std::endl;
+    std::cout << "Test Success!" << std::endl;
     return 0;
 }

@@ -1,6 +1,7 @@
 #include "arr_base_linked_queue.h"
 
 #include <assert.h>
+#include <cstdio>
 
 #include "bitops/bitops.h"
 

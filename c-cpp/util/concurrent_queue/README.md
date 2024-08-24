@@ -46,12 +46,14 @@ wmb - sfence
 
 推荐使用数组方式实现定长无锁并发队列，具体有两种方法：
 
-1. 用数组作为资源池实现定长的链表式无锁队列。
+1. 用数组作为资源池实现定长的链表式无锁队列。(废弃)
    1. 自己基于《[无锁队列的实现》](https://coolshell.cn/articles/8239.html)中无锁链表的实现，进行改造。
    2. 但仍然有ABA问题，需要用引用计数防止释放的方式实现
    3. 存在问题：池化实现比较复杂，开销太大
 2. 论文《Implementing Lock-Free Queues》的实现，需要使用double-CAS，先不考虑
 3. intel dpdk提供的rte_ring实现：http://blog.csdn.net/linzhaolover/article/details/9771329
+
+目前结论：不推荐使用链表实现无锁队列，问题太多
 
 ## ABA问题
 
