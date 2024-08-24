@@ -120,7 +120,7 @@ bool LinkedQueue::enqueue(const void* val) {
     if (!n) return false;
     n->value = val;
     n->next = nullptr;
-    acquire_fence();
+    release_fence();
     Node* tail = nullptr;
     while (true) {
         // 先取一下尾指针和尾指针的next
@@ -154,28 +154,41 @@ bool LinkedQueue::dequeue(const void** val) {
         // Node* tail = SafeRead(tail_);
         // NodeRefGuard g1(head);
         // NodeRefGuard g2(tail);
+        // next访问的节点也可能被释放了，导致后续访问val时出错
+        // 这种出队列的模式就不太好，哎，这里就这样吧
         Node* next = head->next.load(std::memory_order_acquire);
 
         // Q->head 指针已移动，重新取 head指针
         if (head != head_.load(std::memory_order_acquire)) continue;
 
         // 如果是空队列
-        if (head == tail && next == nullptr) {
+        // if (head == tail && next == nullptr) {
+        //     return false;
+        // }
+        if (head == tail) {
             return false;
         }
 
         // 如果 tail 指针落后了
-        if (head == tail && next != nullptr) {
-            tail_.compare_exchange_weak(tail, next, std::memory_order_release, std::memory_order_relaxed);
-            continue;
-        }
+        // 这里释放，存在释放读的问题，导致并发消费异常
+        // if (head == tail && next != nullptr) {
+        //     tail_.compare_exchange_weak(tail, next, std::memory_order_release, std::memory_order_acquire);
+        //     continue;
+        // }
+
+        // bug: 即使放在这里，next也有可能被释放，导致释放后读的问题
+        *val = next->value;
         // 移动 head 指针成功后，取出数据
-        if (head_.compare_exchange_weak(head, next, std::memory_order_release, std::memory_order_relaxed) == true) {
-            *val = next->value;
+        if (head_.compare_exchange_weak(head, next, std::memory_order_release, std::memory_order_acquire) == true) {
+            // 不能放在这里赋值，否则可能会读到已释放的结点
+            // *val = next->value;
             break;
         }
     }
+    release_fence();
     // head->DecRef();  // 释放老的dummy结点
+    // 这里释放，存在释放读的问题，导致并发消费异常
+    // 若把释放删除掉，上面的问题都不存在了
     FreeNode(head);
     return true;
 }

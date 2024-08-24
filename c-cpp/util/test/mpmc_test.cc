@@ -37,7 +37,7 @@ void Enqueue(ThreadInfo& thread_info) {
     uint64_t last_val = thread_id;
     while (i < op_num_per_thread) {
         uint64_t cur_val = (i << 8) | thread_id;
-        if (cur_val != thread_id && cur_val <= last_val) {
+        if (cur_val != thread_id && cur_val != last_val + (1 << 8)) {
             std::cout << "Test Fail!" << std::endl;
             printf("cur_val[%llu] <= last_val[%llu]\n", cur_val, last_val);
             exit(1);
@@ -55,7 +55,7 @@ void Enqueue(ThreadInfo& thread_info) {
 
 void Dequeue(ThreadInfo& thread_info) {
     std::vector<uint64_t> last_seqs;
-    last_seqs.resize(MAX_THREAD_NUM);
+    last_seqs.resize(producer_num);
     printf("Dequeue start, thread_id: %d\n", thread_info.thread_id);
     uint64_t i = 0;
     while (i < op_num_per_thread) {
@@ -64,12 +64,13 @@ void Dequeue(ThreadInfo& thread_info) {
         uint64_t ret = (uint64_t)(uintptr_t)val;
         uint64_t thread_id = ret & 0xff;
         uint64_t seq = ret >> 8;
-        if (seq != 0 &&  seq <= last_seqs[thread_id]) {
+        if (seq != 0 && seq <= last_seqs[thread_id]) {
             std::cout << "Test Fail!" << std::endl;
             printf("thread_id=%llu, seq[%llu] <= last_seqs[%llu]\n", thread_id, seq, last_seqs[thread_id]);
             exit(1);
         }
         last_seqs[thread_id] = seq;
+        // printf("thread_id=%llu, seq=%llu\n", thread_id, seq);
 
         // if(i%100 == 0) printf("dequeue %llu\n", i);
         i++;
@@ -115,10 +116,17 @@ void InitQueue() {
 // kfifo：./bazel-bin/util/test/mpmc_test 0 4096 100000000 1 1
 //      146256456 ops/sec 6.8373 ns
 // linked_queue: ./bazel-bin/util/test/mpmc_test 2 4096 100000000 1 1
-//     1-1: 15296317 ops/sec 65.3752 ns
+//   不执行delete node
+//     1-1: 26282448 ops/sec 38.0482 ns
+//     2-2: 17785504 ops/sec 56.2256 ns
+//     4-4: 6419411 ops/sec  155.778 ns
+//   执行delete node
+//     1-1: 15704363 ops/sec 63.6766 ns
+// 
 
 // ./bazel-bin/util/test/mpmc_test 2 4096 1000000 2 2
 int main(int argc, char** argv) {
+    printf("1<<8: %llu, (1<<8 + 1) & 0xff: %llu\n", (1llu << 8), ((1llu << 8) + 1) & 0xff);
     if (argc < 6) {
         // kfifo 只支持单生产者单消费者
         printf("Usage: %s <type: 0-kfifo, 1-arr_base_linked_queue, 2-linked_queue> <size> <op_num_per_thread> <producer_num> <consumer_num>\n",
@@ -148,6 +156,11 @@ int main(int argc, char** argv) {
     for(int i = 0; i < producer_num; i++) {
         threads.push_back(std::thread(Enqueue, std::ref(producer_thread_info[i])));
     }
+
+    // for (auto& thread : threads) {
+    //     thread.join();
+    // }
+    // threads.clear();
 
     for(int i = 0; i < consumer_num; i++) {
         threads.push_back(std::thread(Dequeue, std::ref(consumer_thread_info[i])));

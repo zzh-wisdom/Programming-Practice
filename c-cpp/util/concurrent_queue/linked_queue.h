@@ -5,7 +5,9 @@
 
 #include "con_queue.h"
 
-// FIXME: 存在并发时原子操作的ABA问题
+// FIXME: 存在并发时原子操作的ABA问题，存在释放读的问题，这种链表的设计模式存在诸多问题
+// 用于单生产者单消费者还是没问题的，但是性能又远不如kfifo
+// 综合来看基于链表的无锁并发队列 实现困难，且 性能也不好
 class LinkedQueue : public ConQueue
 {
 private:
