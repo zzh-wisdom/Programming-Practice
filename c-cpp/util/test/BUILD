@@ -9,9 +9,9 @@ cc_binary(
     ]),
     copts = [
         "-Werror",
-        "-Wall"
+        "-Wall",
         # "-Wno-sign-compare",
-        # "-Wno-error=format"
+        "-Wno-error=format"
     ],
     deps = [
         "//util/concurrent_queue:concurrent_queue",
@@ -27,9 +27,9 @@ cc_binary(
     ]),
     copts = [
         "-Werror",
-        "-Wall"
+        "-Wall",
         # "-Wno-sign-compare",
-        # "-Wno-error=format"
+        "-Wno-error=format"
     ],
     deps = [
         "//util/concurrent_queue:concurrent_queue",
