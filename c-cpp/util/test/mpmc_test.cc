@@ -10,6 +10,7 @@
 #include "concurrent_queue/kfifo.h"
 #include "concurrent_queue/arr_base_linked_queue.h"
 #include "concurrent_queue/linked_queue.h"
+#include "concurrent_queue/moodycamel_cq.h"
 
 const int MAX_THREAD_NUM = 128;
 uint64_t type;
@@ -35,7 +36,8 @@ void Enqueue(ThreadInfo& thread_info) {
     uint64_t i = 0;
     uint64_t thread_id = thread_info.thread_id;
     uint64_t last_val = thread_id;
-    while (i < op_num_per_thread) {
+    uint64_t op_num = (op_num_per_thread * std::max(producer_num, consumer_num) + producer_num * consumer_num - 1) / producer_num;
+    while (i < op_num) {
         uint64_t cur_val = (i << 8) | thread_id;
         if (cur_val != thread_id && cur_val != last_val + (1 << 8)) {
             std::cout << "Test Fail!" << std::endl;
@@ -58,7 +60,8 @@ void Dequeue(ThreadInfo& thread_info) {
     last_seqs.resize(producer_num);
     printf("Dequeue start, thread_id: %d\n", thread_info.thread_id);
     uint64_t i = 0;
-    while (i < op_num_per_thread) {
+    uint64_t op_num = (op_num_per_thread * std::max(producer_num, consumer_num)) / consumer_num;
+    while (i < op_num) {
         const void* val;
         if (!queue->dequeue(&val)) continue;
         uint64_t ret = (uint64_t)(uintptr_t)val;
@@ -96,13 +99,16 @@ void InitQueue() {
     switch (type) 
     {
     case 0:
-        queue = new KFifo(size);
+        queue = new KFifo(size);  // 不适合mpmc
         break;
     case 1:
-        queue = new ArrayBaseLinkedQueue(size);
+        queue = new ArrayBaseLinkedQueue(size);  // 有bug
         break;
     case 2:
-        queue = new LinkedQueue(size);
+        queue = new LinkedQueue(size); // 有bug
+        break;
+    case 3:
+        queue = new MoodycamelCQ(size);
         break;
     default:
         printf("Not support type: %llu\n", type);
@@ -123,13 +129,27 @@ void InitQueue() {
 //   执行delete node
 //     1-1: 15704363 ops/sec 63.6766 ns
 // 
-
+// moodycamel_cq: ./bazel-bin/util/test/mpmc_test 3 4096 100000000 1 1
+//      1-1: 69598382 ops/sec 14.3681 ns
+//      2-2: 38883026 ops/sec 25.7182 ns
+//      4-4: 22324053 ops/sec 44.7947 ns
+//      8-8: 16035304 ops/sec 62.3624 ns
+//
+//      2-1: 63332375 ops/sec 15.7897 ns
+//      4-1: 66138872 ops/sec 15.1197 ns
+//      8-1: 28164034 ops/sec 35.5063 ns
+//
+//      1-2: 28739693 ops/sec 34.7951 ns
+//      1-4: 27932294 ops/sec 35.8009 ns
+//      1-8: 7539902 ops/sec 132.628 ns
+//      比较适合多生产者单消费者场景
+//
 // ./bazel-bin/util/test/mpmc_test 2 4096 1000000 2 2
 int main(int argc, char** argv) {
     printf("1<<8: %llu, (1<<8 + 1) & 0xff: %llu\n", (1llu << 8), ((1llu << 8) + 1) & 0xff);
     if (argc < 6) {
         // kfifo 只支持单生产者单消费者
-        printf("Usage: %s <type: 0-kfifo, 1-arr_base_linked_queue, 2-linked_queue> <size> <op_num_per_thread> <producer_num> <consumer_num>\n",
+        printf("Usage: %s <type: 0-kfifo, 1-arr_base_linked_queue, 2-linked_queue, 3-moodycamel_cq> <size> <op_num_per_thread> <producer_num> <consumer_num>\n",
                argv[0]);
         return -1;
     }
@@ -171,7 +191,8 @@ int main(int argc, char** argv) {
     auto end_times = NowNanos();
 
     double cost_sec = (end_times - start_times) * 1.0 / 1000000000;
-    uint64_t op_num = op_num_per_thread * (producer_num + consumer_num);
+    // uint64_t op_num = op_num_per_thread * (producer_num + consumer_num);
+    uint64_t op_num = op_num_per_thread * std::max(producer_num, consumer_num) * 2;
     std::cout << "total op_num: " << op_num  << std::endl;
     std::cout << "cost time: " << cost_sec << " s" << std::endl;
     std::cout << "Average Throughput: "

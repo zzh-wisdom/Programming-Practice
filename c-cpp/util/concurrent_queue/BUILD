@@ -17,5 +17,7 @@ cc_library(
     deps = [
         "//util/memory_order:memory_order",
         "//util/bitops:bitops",
+        "//util/concurrent_queue/MOODYCAMEL_SPSC:MOODYCAMEL_SPSC",
+        "//util/concurrent_queue/MOODYCAMEL_ConcurrentQueue:MOODYCAMEL_ConcurrentQueue"
     ],
 )

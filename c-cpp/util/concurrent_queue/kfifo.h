@@ -44,8 +44,11 @@
  * 2. 数组存储指针类型，每个指针是一个record
  */
 
+#define KFIFO_CACHE_LINE_SIZE 64
 struct __kfifo {
 	uint32_t	in;
+	// cacheline对齐之后还变慢了，可能是spsc的场景竞争不大
+	// char cachelineFiller[KFIFO_CACHE_LINE_SIZE - sizeof(uint32_t)];
 	uint32_t	out;
 	uint32_t	mask;
 	const void*	    *data;

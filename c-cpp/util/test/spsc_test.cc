@@ -8,13 +8,14 @@
 
 #include "concurrent_queue/kfifo.h"
 #include "concurrent_queue/arr_base_linked_queue.h"
+#include "concurrent_queue/moodycamel_spsc.h"
 
 uint64_t type;
 uint64_t size;
 uint64_t op_num;
 uint64_t run_time = 60;  // 单位为秒
 std::vector<std::thread> threads;
-std::vector<ThreadInfo> thread_info;
+std::vector<ThreadInfo> thread_infos;
 ConQueue* queue = nullptr;
 std::atomic<bool> quit(false);
 
@@ -67,6 +68,9 @@ void InitQueue() {
     case 2:
         queue = new ArrayBaseLinkedQueue(size);
         break;
+    case 3:
+        queue = new MoodycamelSpsc(size);
+        break;
     default:
         printf("Not support type: %llu\n", type);
         exit(1);
@@ -80,9 +84,11 @@ void InitQueue() {
 // avg: 7.19783 nsec/op
 // ./bazel-bin/util/test/spsc_test 2 4096 100000000
 // avg: 75.3207 nsec/op
+// ./bazel-bin/util/test/spsc_test 3 4096 100000000
+// avg: 8.64263 nsec/op
 int main(int argc, char** argv) {
     if (argc < 4) {
-        printf("Usage: %s <type: 1-kfifo, 2-std::arr_base_linked_queue> <size> <op_num>\n",
+        printf("Usage: %s <type: 1-kfifo, 2-arr_base_linked_queue, 3-moodycamel_spsc> <size> <op_num>\n",
                argv[0]);
         return -1;
     }
@@ -92,11 +98,11 @@ int main(int argc, char** argv) {
     InitQueue();
     printf("type: %llu, queue capacity: %d, op_num: %llu\n", type, queue->capacity(), op_num);
 
-    thread_info.resize(2);
+    thread_infos.resize(2);
 
     auto start_times = NowNanos();
-    threads.push_back(std::thread(Enqueue, std::ref(thread_info[0])));
-    threads.push_back(std::thread(Dequeue, std::ref(thread_info[1])));
+    threads.push_back(std::thread(Enqueue, std::ref(thread_infos[0])));
+    threads.push_back(std::thread(Dequeue, std::ref(thread_infos[1])));
     for (auto& thread : threads) {
         thread.join();
     }
