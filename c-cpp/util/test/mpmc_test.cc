@@ -11,6 +11,7 @@
 #include "concurrent_queue/arr_base_linked_queue.h"
 #include "concurrent_queue/linked_queue.h"
 #include "concurrent_queue/moodycamel_cq.h"
+#include "concurrent_queue/rte_ring.h"
 
 const int MAX_THREAD_NUM = 128;
 uint64_t type;
@@ -110,6 +111,9 @@ void InitQueue() {
     case 3:
         queue = new MoodycamelCQ(size);
         break;
+    case 4:
+        queue = new RteRing(size);
+        break;
     default:
         printf("Not support type: %llu\n", type);
         exit(1);
@@ -144,12 +148,21 @@ void InitQueue() {
 //      1-8: 7539902 ops/sec 132.628 ns
 //      比较适合多生产者单消费者场景，除非指定令牌消费
 //
-// ./bazel-bin/util/test/mpmc_test 2 4096 1000000 2 2
+// rte_ring: ./bazel-bin/util/test/mpmc_test 4 4096 100000000 1 1
+//      1-1:  39830433 ops/sec 25.1064 ns
+//      2-2:  17534388 ops/sec 57.0308 ns
+//      4-4:  3057500 ops/sec  327.064 ns
+//      慢的一批，竞争太大了，不如拆分成多个1对多的场景
+//      2-1:  17940918 ops/sec 55.7385 ns
+//      4-1:  14334485 ops/sec 69.7618 ns
+//
+//      1-2:  20700630 ops/sec 48.3077 ns
+//      1-4:  13862430 ops/sec 72.1374 ns
 int main(int argc, char** argv) {
     printf("1<<8: %llu, (1<<8 + 1) & 0xff: %llu\n", (1llu << 8), ((1llu << 8) + 1) & 0xff);
     if (argc < 6) {
         // kfifo 只支持单生产者单消费者
-        printf("Usage: %s <type: 0-kfifo, 1-arr_base_linked_queue, 2-linked_queue, 3-moodycamel_cq> <size> <op_num_per_thread> <producer_num> <consumer_num>\n",
+        printf("Usage: %s <type: 0-kfifo, 1-arr_base_linked_queue, 2-linked_queue, 3-moodycamel_cq, 4-rte_ring> <size> <op_num_per_thread> <producer_num> <consumer_num>\n",
                argv[0]);
         return -1;
     }
