@@ -1501,6 +1501,7 @@ private:
 				// Note that we don't need to release any memory effects, but we do need to ensure that the reference
 				// count decrement happens-after the CAS on the head.
 				refs = prevHead->freeListRefs.fetch_sub(1, std::memory_order_acq_rel);
+				// 可能是其他线程出队后，又重新add的残留任务
 				if (refs == SHOULD_BE_ON_FREELIST + 1) {
 					add_knowing_refcount_is_zero(prevHead);
 				}

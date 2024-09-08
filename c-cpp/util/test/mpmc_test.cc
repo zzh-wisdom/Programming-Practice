@@ -142,7 +142,7 @@ void InitQueue() {
 //      1-2: 28739693 ops/sec 34.7951 ns
 //      1-4: 27932294 ops/sec 35.8009 ns
 //      1-8: 7539902 ops/sec 132.628 ns
-//      比较适合多生产者单消费者场景
+//      比较适合多生产者单消费者场景，除非指定令牌消费
 //
 // ./bazel-bin/util/test/mpmc_test 2 4096 1000000 2 2
 int main(int argc, char** argv) {
