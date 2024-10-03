@@ -12,7 +12,7 @@ ALL_TARGET =
 
 TEST_TOOLS = test_test test_test_smp util_test_spsc_test util_test_mpmc_test
 
-.PHONY: all clean test_tools ${ALL_TARGET} ${TEST_TOOLS}
+.PHONY: all clean test_tools prepare version ${ALL_TARGET} ${TEST_TOOLS}
 
 all: ${ALL_TARGET} test_tools
 
@@ -20,6 +20,9 @@ test_tools: ${TEST_TOOLS}
 
 clean:
 	${BAZEL} clean
+
+prepare:
+	python2 util/version/gen_version.py
 
 test_test:
 	${BAZEL} build ${BUILD_OPT} test:test
@@ -32,3 +35,7 @@ util_test_spsc_test:
 
 util_test_mpmc_test:
 	${BAZEL} build ${BUILD_OPT} util/test:mpmc_test
+
+
+version:
+	${BAZEL} build ${BUILD_OPT} util/version:version
